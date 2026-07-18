@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Web Visor</string>
+    <string name="empty_state_message">Escaneá un código QR o abrí un enlace desde WhatsApp, el correo o la galería para comenzar.</string>
+</resources>

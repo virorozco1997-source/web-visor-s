@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Círculo blanco central -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,24 C71.67,24 86,38.33 86,56 C86,73.67 71.67,88 54,88 C36.33,88 22,73.67 22,56 C22,38.33 36.33,24 54,24 Z" />
+
+    <!-- Monograma "W" en verde sage -->
+    <path
+        android:fillColor="#87A96B"
+        android:pathData="M33,42 L41,42 L47,66 L54,46 L61,66 L67,42 L75,42 L64,74 L54,74 L48,56 L42,74 L32,74 Z" />
+
+</vector>
