@@ -86,17 +86,22 @@ class MainActivity : AppCompatActivity() {
         settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
         settings.userAgentString = settings.userAgentString + " WebVisor/1.0"
 
-        // Compartir discreto: mantener presionado en cualquier parte de la
-        // pantalla comparte el link actual, sin ningún botón visible.
+        // Compartir discreto: mantener presionado la franja inferior de la
+        // pantalla (últimos ~56dp) comparte el link actual. Se limita a esa
+        // franja a propósito para no interferir con la selección de texto
+        // nativa del WebView en el resto del contenido.
+        val shareStripHeightPx = (56 * resources.displayMetrics.density).toInt()
         val shareGestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onLongPress(e: MotionEvent) {
                 shareCurrentUrl()
             }
         })
-        webView.setOnTouchListener { _, event ->
-            shareGestureDetector.onTouchEvent(event)
-            // Devolvemos false para no interferir con el scroll, el zoom ni
-            // el long-press nativo del WebView sobre links/imágenes.
+        webView.setOnTouchListener { view, event ->
+            if (event.y >= view.height - shareStripHeightPx) {
+                shareGestureDetector.onTouchEvent(event)
+            }
+            // Devolvemos false siempre para que el WebView reciba el evento
+            // con normalidad (scroll, zoom, selección de texto, etc.).
             false
         }
 
@@ -156,7 +161,7 @@ class MainActivity : AppCompatActivity() {
     /**
      * Comparte la URL actualmente cargada usando el selector nativo de
      * Android (WhatsApp, Email, copiar al portapapeles, etc.). Se activa
-     * con un long-press en cualquier parte de la pantalla; como única
+     * con un long-press en la franja inferior de la pantalla; como única
      * confirmación visible se usa una vibración breve, sin ícono ni botón.
      */
     private fun shareCurrentUrl() {
