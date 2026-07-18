@@ -1,21 +1,28 @@
 package com.webvisor.app
 
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Bundle
+import android.os.Environment
 import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.webkit.CookieManager
+import android.webkit.MimeTypeMap
 import android.webkit.SslErrorHandler
+import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -39,6 +46,8 @@ class MainActivity : AppCompatActivity() {
 
         setupEdgeToEdgeTransparentStatusBar()
         setupWebView()
+        setupFullScreenOnScroll()
+        setupDownloads()
 
         binding.swipeRefresh.setOnRefreshListener {
             binding.webView.reload()
@@ -96,6 +105,38 @@ class MainActivity : AppCompatActivity() {
         binding.root.setOnApplyWindowInsetsListener { view, insets ->
             // No forzamos padding: dejamos que el WebView llegue hasta el borde.
             view.onApplyWindowInsets(insets)
+        }
+    }
+
+    /**
+     * Oculta la barra de estado y la barra de navegación (modo inmersivo)
+     * para que la web ocupe toda la pantalla.
+     */
+    private fun hideSystemBars() {
+        val controller = WindowInsetsControllerCompat(window, binding.root)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+    }
+
+    /** Vuelve a mostrar la barra de estado y la de navegación. */
+    private fun showSystemBars() {
+        val controller = WindowInsetsControllerCompat(window, binding.root)
+        controller.show(WindowInsetsCompat.Type.systemBars())
+    }
+
+    /**
+     * Al empezar a scrollear la web, las barras de arriba y abajo
+     * desaparecen para dejar la página en pantalla completa. Si el usuario
+     * vuelve al principio de la página, las barras reaparecen.
+     */
+    private fun setupFullScreenOnScroll() {
+        binding.webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            if (scrollY > 0) {
+                hideSystemBars()
+            } else {
+                showSystemBars()
+            }
         }
     }
 
@@ -174,6 +215,63 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     openWithExternalApp(uri)
                 }
+            }
+        }
+    }
+
+    /**
+     * Registra un DownloadListener en el WebView: cualquier archivo que la
+     * página quiera descargar (PDF, imágenes, adjuntos, etc.) se manda al
+     * DownloadManager del sistema, que se encarga de bajarlo a la carpeta
+     * "Descargas" del dispositivo y mostrar el progreso/notificación.
+     */
+    private fun setupDownloads() {
+        binding.webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            try {
+                val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                val cookies = CookieManager.getInstance().getCookie(url)
+
+                val request = DownloadManager.Request(Uri.parse(url)).apply {
+                    setMimeType(
+                        mimeType.takeIf { it.isNotBlank() }
+                            ?: MimeTypeMap.getSingleton()
+                                .getMimeTypeFromExtension(
+                                    MimeTypeMap.getFileExtensionFromUrl(url)
+                                )
+                            ?: "application/octet-stream"
+                    )
+                    if (!cookies.isNullOrEmpty()) {
+                        addRequestHeader("cookie", cookies)
+                    }
+                    addRequestHeader("User-Agent", userAgent)
+                    setDescription(getString(R.string.app_name))
+                    setTitle(fileName)
+                    setNotificationVisibility(
+                        DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                    )
+                    setDestinationInExternalPublicDir(
+                        Environment.DIRECTORY_DOWNLOADS,
+                        fileName
+                    )
+                    setAllowedOverMetered(true)
+                    setAllowedOverRoaming(true)
+                }
+
+                val downloadManager =
+                    getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                downloadManager.enqueue(request)
+
+                Toast.makeText(
+                    this,
+                    getString(R.string.downloading_toast, fileName),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this,
+                    getString(R.string.download_error),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
