@@ -109,20 +109,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Oculta la barra de estado y la barra de navegación (modo inmersivo)
-     * para que la web ocupe toda la pantalla.
+     * Oculta la barra de navegación inferior (modo inmersivo) para que la
+     * web ocupe toda la pantalla como una app. La barra de estado (reloj,
+     * batería, señal) NO se toca: queda siempre visible.
      */
     private fun hideSystemBars() {
         val controller = WindowInsetsControllerCompat(window, binding.root)
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.hide(WindowInsetsCompat.Type.navigationBars())
     }
 
-    /** Vuelve a mostrar la barra de estado y la de navegación. */
+    /** Vuelve a mostrar la barra de navegación inferior. */
     private fun showSystemBars() {
         val controller = WindowInsetsControllerCompat(window, binding.root)
-        controller.show(WindowInsetsCompat.Type.systemBars())
+        controller.show(WindowInsetsCompat.Type.navigationBars())
     }
 
     /**
