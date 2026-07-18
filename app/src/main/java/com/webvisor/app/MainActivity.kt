@@ -7,6 +7,9 @@ import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Bundle
+import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.SslErrorHandler
 import android.webkit.WebResourceRequest
@@ -83,6 +86,20 @@ class MainActivity : AppCompatActivity() {
         settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
         settings.userAgentString = settings.userAgentString + " WebVisor/1.0"
 
+        // Compartir discreto: mantener presionado en cualquier parte de la
+        // pantalla comparte el link actual, sin ningún botón visible.
+        val shareGestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onLongPress(e: MotionEvent) {
+                shareCurrentUrl()
+            }
+        })
+        webView.setOnTouchListener { _, event ->
+            shareGestureDetector.onTouchEvent(event)
+            // Devolvemos false para no interferir con el scroll, el zoom ni
+            // el long-press nativo del WebView sobre links/imágenes.
+            false
+        }
+
         webView.webViewClient = object : WebViewClient() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -134,6 +151,25 @@ class MainActivity : AppCompatActivity() {
             // No hay app instalada que maneje ese esquema; evitamos crash.
             true
         }
+    }
+
+    /**
+     * Comparte la URL actualmente cargada usando el selector nativo de
+     * Android (WhatsApp, Email, copiar al portapapeles, etc.). Se activa
+     * con un long-press en cualquier parte de la pantalla; como única
+     * confirmación visible se usa una vibración breve, sin ícono ni botón.
+     */
+    private fun shareCurrentUrl() {
+        val url = binding.webView.url
+        if (url.isNullOrEmpty()) return
+
+        binding.webView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, url)
+        }
+        startActivity(Intent.createChooser(shareIntent, null))
     }
 
     /**
