@@ -127,9 +127,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Al empezar a scrollear la web, las barras de arriba y abajo
-     * desaparecen para dejar la página en pantalla completa. Si el usuario
-     * vuelve al principio de la página, las barras reaparecen.
+     * Al empezar a scrollear la web, la barra de navegación inferior
+     * desaparece para dejar la página en pantalla completa, como si fuera
+     * una app nativa. El reloj y la batería (barra de estado) siguen
+     * visibles todo el tiempo. Si el usuario vuelve al principio de la
+     * página, la barra de navegación reaparece.
      */
     private fun setupFullScreenOnScroll() {
         binding.webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
