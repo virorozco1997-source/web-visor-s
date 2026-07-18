@@ -24,6 +24,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -44,7 +45,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupEdgeToEdgeTransparentStatusBar()
+        setupStatusBar()
         setupWebView()
         setupFullScreenOnScroll()
         setupDownloads()
@@ -94,18 +95,78 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Barra de estado invisible/transparente para maximizar el espacio
-     * de la web. El contenido se dibuja también detrás de la status bar.
+     * La barra de estado y la de navegación reservan su propio espacio
+     * (nada se dibuja detrás): la web se ve como el contenido normal de una
+     * app, no "por debajo" de la hora/batería. El color de ambas barras se
+     * sincroniza con el fondo de cada página (ver syncStatusBarColorWithPage).
      */
-    private fun setupEdgeToEdgeTransparentStatusBar() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.TRANSPARENT
+    private fun setupStatusBar() {
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+    }
 
-        binding.root.setOnApplyWindowInsetsListener { view, insets ->
-            // No forzamos padding: dejamos que el WebView llegue hasta el borde.
-            view.onApplyWindowInsets(insets)
+    /**
+     * Lee el color de fondo real de la página cargada (el de <body>, o si
+     * ese es transparente, el de <html>) y lo aplica a la barra de estado y
+     * a la de navegación, para que se vean como una continuación de la web
+     * en vez de una franja de color fijo ajena a la página.
+     */
+    private fun syncStatusBarColorWithPage() {
+        val script = """
+            (function() {
+                var bodyColor = window.getComputedStyle(document.body).backgroundColor;
+                if (!bodyColor || bodyColor === 'rgba(0, 0, 0, 0)' || bodyColor === 'transparent') {
+                    return window.getComputedStyle(document.documentElement).backgroundColor;
+                }
+                return bodyColor;
+            })();
+        """.trimIndent()
+
+        binding.webView.evaluateJavascript(script) { rawResult ->
+            val color = parseCssColor(rawResult) ?: return@evaluateJavascript
+            applyBarsColor(color)
         }
+    }
+
+    /** Aplica un color a ambas barras del sistema y ajusta el color de sus íconos. */
+    private fun applyBarsColor(color: Int) {
+        window.statusBarColor = color
+        window.navigationBarColor = color
+
+        val lightIcons = isColorLight(color)
+        val controller = WindowInsetsControllerCompat(window, binding.root)
+        controller.isAppearanceLightStatusBars = lightIcons
+        controller.isAppearanceLightNavigationBars = lightIcons
+    }
+
+    /**
+     * Convierte el resultado de evaluateJavascript (un string con formato
+     * CSS, ej. "rgb(18, 18, 18)" o "rgba(18, 18, 18, 1)", entre comillas
+     * dobles por venir de JSON) a un color de Android. Devuelve null si no
+     * se pudo interpretar o si el fondo es completamente transparente.
+     */
+    private fun parseCssColor(rawResult: String?): Int? {
+        if (rawResult.isNullOrBlank() || rawResult == "null") return null
+
+        val unquoted = rawResult.trim().removeSurrounding("\"")
+        val numbers = Regex("[\\d.]+").findAll(unquoted).map { it.value }.toList()
+        if (numbers.size < 3) return null
+
+        return try {
+            val r = numbers[0].toFloat().toInt().coerceIn(0, 255)
+            val g = numbers[1].toFloat().toInt().coerceIn(0, 255)
+            val b = numbers[2].toFloat().toInt().coerceIn(0, 255)
+            val alpha = if (numbers.size >= 4) numbers[3].toFloat() else 1f
+            if (alpha <= 0f) return null
+            Color.rgb(r, g, b)
+        } catch (e: NumberFormatException) {
+            null
+        }
+    }
+
+    /** true si el color es "claro" (conviene usar íconos oscuros encima). */
+    private fun isColorLight(color: Int): Boolean {
+        val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
+        return luminance > 0.5
     }
 
     /**
@@ -191,6 +252,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 binding.swipeRefresh.isRefreshing = false
+                syncStatusBarColorWithPage()
             }
 
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler, error: SslError?) {
@@ -324,6 +386,7 @@ class MainActivity : AppCompatActivity() {
             // La app se abrió desde el ícono, sin ningún enlace: mostramos
             // una pantalla de espera en lugar de una web en blanco.
             binding.emptyState.visibility = View.VISIBLE
+            applyBarsColor(ContextCompat.getColor(this, R.color.sage_green))
         }
     }
 
@@ -333,5 +396,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             super.onBackPressed()
         }
+    }
+}
     }
 }
