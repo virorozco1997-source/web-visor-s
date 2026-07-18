@@ -3,6 +3,7 @@ package com.webvisor.app
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
@@ -19,6 +20,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import com.webvisor.app.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -41,7 +44,38 @@ class MainActivity : AppCompatActivity() {
             binding.webView.reload()
         }
 
+        applyDarkModePreferences()
         handleIncomingIntent(intent)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // La Activity está marcada con android:configChanges="...|uiMode" para
+        // no reiniciarse (perdería la página cargada) cuando el sistema pasa
+        // de claro a oscuro o viceversa. Por eso el ajuste se hace a mano acá.
+        applyDarkModePreferences(newConfig)
+    }
+
+    private fun isSystemInDarkMode(config: Configuration = resources.configuration): Boolean {
+        val nightModeFlags = config.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
+    }
+
+    /**
+     * Sincroniza la app con el modo claro/oscuro del sistema:
+     * - Color de los íconos de la barra de estado (oscuros sobre fondo claro,
+     *   claros sobre fondo oscuro).
+     * - Le pide al WebView que oscurezca automáticamente las páginas que no
+     *   tengan su propio modo oscuro (si el dispositivo lo soporta).
+     */
+    private fun applyDarkModePreferences(config: Configuration = resources.configuration) {
+        val isDark = isSystemInDarkMode(config)
+
+        WindowInsetsControllerCompat(window, binding.root).isAppearanceLightStatusBars = !isDark
+
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(binding.webView.settings, isDark)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -58,9 +92,6 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
-
-        val insetsController = WindowInsetsControllerCompat(window, binding.root)
-        insetsController.isAppearanceLightStatusBars = false
 
         binding.root.setOnApplyWindowInsetsListener { view, insets ->
             // No forzamos padding: dejamos que el WebView llegue hasta el borde.
