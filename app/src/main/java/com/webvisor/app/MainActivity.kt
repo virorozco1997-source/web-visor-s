@@ -86,6 +86,11 @@ class MainActivity : AppCompatActivity() {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(binding.webView.settings, isDark)
         }
+
+        // El cambio de modo claro/oscuro puede alterar cómo se ve la misma
+        // página (por el oscurecido forzado del WebView), así que
+        // recalculamos el color de las barras.
+        syncStatusBarColorWithPage()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -102,6 +107,18 @@ class MainActivity : AppCompatActivity() {
      */
     private fun setupStatusBar() {
         WindowCompat.setDecorFitsSystemWindows(window, true)
+    }
+
+    /**
+     * true si el WebView está forzando actualmente un renderizado oscuro
+     * (algorithmic darkening) porque el sistema está en modo oscuro. En ese
+     * caso, el color de fondo "real" de la página (el que devuelve JS) no
+     * coincide con lo que realmente se ve en pantalla, así que hay que
+     * corregirlo al calcular el color de las barras.
+     */
+    private fun isForcedDarkRenderingActive(): Boolean {
+        return isSystemInDarkMode() &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)
     }
 
     /**
@@ -122,7 +139,16 @@ class MainActivity : AppCompatActivity() {
         """.trimIndent()
 
         binding.webView.evaluateJavascript(script) { rawResult ->
-            val color = parseCssColor(rawResult) ?: return@evaluateJavascript
+            var color = parseCssColor(rawResult) ?: return@evaluateJavascript
+
+            // El WebView está mostrando la página oscurecida artificialmente,
+            // pero el color que acabamos de leer es el original (claro) de
+            // la web: usamos el fondo oscuro de la app en su lugar para que
+            // las barras coincidan con lo que se ve en pantalla.
+            if (isForcedDarkRenderingActive() && isColorLight(color)) {
+                color = ContextCompat.getColor(this, R.color.window_background)
+            }
+
             applyBarsColor(color)
         }
     }
