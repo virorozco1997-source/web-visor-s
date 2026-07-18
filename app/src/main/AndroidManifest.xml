@@ -7,6 +7,9 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Necesario en Android 13+ para que DownloadManager pueda mostrar la
+         notificación de progreso/finalización de las descargas. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
 
     <application
